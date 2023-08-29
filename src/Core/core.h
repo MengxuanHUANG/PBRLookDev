@@ -1,0 +1,21 @@
+#pragma once
+
+#include <assert.h>
+#include <memory>
+#include <string>
+
+#define GLEW_STATIC
+
+#ifdef MY_DEBUG
+#define ASSERT(x) assert((x))
+#else
+#define ASSERT(x)
+#endif
+
+#define SMART_POINTERS
+#define uPtr std::unique_ptr
+#define sPtr std::shared_ptr
+#define wPtr std::weak_ptr
+
+#define mkU std::make_unique
+#define mkS std::make_shared
