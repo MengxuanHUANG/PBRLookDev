@@ -19,3 +19,5 @@
 
 #define mkU std::make_unique
 #define mkS std::make_shared
+
+#define BIT(x) (1 << (x))
