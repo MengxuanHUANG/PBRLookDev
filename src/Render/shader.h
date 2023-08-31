@@ -41,20 +41,4 @@ namespace PBRLookDev
 		uint32_t m_RendererID;
 		std::string m_Name;
 	};
-
-	class ShaderLib
-	{
-	public:
-		void Add(const std::string& name, uPtr<OpenglShader>& shader);
-		void Add(uPtr<OpenglShader>& shader);
-
-		OpenglShader* Load(const std::string& filePath);
-		OpenglShader* Load(const std::string& name, const std::string& filePath);
-
-		OpenglShader* Get(const std::string& name);
-
-		bool Exists(const std::string& name) const;
-	private:
-		std::unordered_map<std::string, uPtr<OpenglShader>> m_Shaders;
-	};
 }

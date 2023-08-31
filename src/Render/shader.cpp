@@ -222,38 +222,4 @@ namespace PBRLookDev
 	{
 		return mkU<OpenglShader>(name, vertexSrc, fragmentSrc);;
 	}
-	
-	void ShaderLib::Add(const std::string& name, uPtr<OpenglShader>& shader)
-	{
-		ASSERT(!Exists(name));
-		m_Shaders.emplace(name, std::move(shader));
-	}
-	void ShaderLib::Add(uPtr<OpenglShader>& shader)
-	{
-		std::string name = shader->GetName();
-		Add(name, shader);
-	}
-	OpenglShader* ShaderLib::Load(const std::string& filePath)
-	{
-		auto shader = OpenglShader::Create(filePath);
-		OpenglShader* raw_shader = shader.get();
-		Add(shader);
-		return raw_shader;
-	}
-	OpenglShader* ShaderLib::Load(const std::string& name, const std::string& filePath)
-	{
-		auto shader = OpenglShader::Create(filePath);
-		OpenglShader* raw_shader = shader.get();
-		Add(name, shader);
-		return raw_shader;
-	}
-	OpenglShader* ShaderLib::Get(const std::string& name)
-	{
-		ASSERT(Exists(name));
-		return m_Shaders[name].get();
-	}
-	bool ShaderLib::Exists(const std::string& name) const
-	{
-		return m_Shaders.find(name) != m_Shaders.end();
-	}
 }

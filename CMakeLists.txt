@@ -25,6 +25,10 @@ find_package(OpenGL REQUIRED)
 set(GLM_ROOT_DIR ${EXTERNAL})
 find_package(GLM REQUIRED)
 
+#set project dir
+file(TO_CMAKE_PATH ${CMAKE_SOURCE_DIR} PROJ_BASE_PATH_NORMALIZED)
+add_definitions(-DPROJ_BASE_PATH=${PROJ_BASE_PATH_NORMALIZED})
+
 # set SRC_ROOT_DIR
 set(SRC_ROOT_DIR "src")
 # set library
