@@ -25,6 +25,31 @@ find_package(OpenGL REQUIRED)
 set(GLM_ROOT_DIR ${EXTERNAL})
 find_package(GLM REQUIRED)
 
+set(IMGUI_ROOT_DIR ${EXTERNAL})
+find_package(IMGUI REQUIRED)
+
+# ImGui Library
+file(GLOB imgui_headers 
+    "${IMGUI_INCLUDE_DIRS}/imgui/*.cpp" 
+    "${IMGUI_INCLUDE_DIRS}/imgui/backends/imgui_impl_glfw.cpp"
+    "${IMGUI_INCLUDE_DIRS}/imgui/backends/imgui_impl_opengl3.cpp"
+)
+
+file(GLOB imgui_sources 
+    "${IMGUI_INCLUDE_DIRS}/imgui/*.h"
+    "${IMGUI_INCLUDE_DIRS}/imgui/backends/imgui_impl_glfw.h"
+    "${IMGUI_INCLUDE_DIRS}/imgui/backends/imgui_impl_opengl3.h"
+)
+
+list(SORT headers)
+list(SORT sources)
+
+add_library(ImGui STATIC ${imgui_headers} ${imgui_sources})
+target_include_directories(ImGui PUBLIC
+    ${GLFW_INCLUDE_DIR} 
+    "${IMGUI_INCLUDE_DIRS}/imgui"
+)
+
 #set project dir
 file(TO_CMAKE_PATH ${CMAKE_SOURCE_DIR} PROJ_BASE_PATH_NORMALIZED)
 add_definitions(-DPROJ_BASE_PATH=${PROJ_BASE_PATH_NORMALIZED})
@@ -32,7 +57,7 @@ add_definitions(-DPROJ_BASE_PATH=${PROJ_BASE_PATH_NORMALIZED})
 # set SRC_ROOT_DIR
 set(SRC_ROOT_DIR "src")
 # set library
-set(LIBRARIES ${GLEW_LIBRARY} ${GLFW_LIBRARY} ${OPENGL_LIBRARY})
+set(LIBRARIES ${GLEW_LIBRARY} ${GLFW_LIBRARY} ${OPENGL_LIBRARY} ImGui )
 
 # set library
 set(INCLUDE_DIR
@@ -40,6 +65,7 @@ set(INCLUDE_DIR
     ${GLM_INCLUDE_DIRS} 
     ${GLEW_INCLUDE_DIR} 
     ${GLFW_INCLUDE_DIR}
+    ${IMGUI_INCLUDE_DIRS}
 )
 
 file(GLOB_RECURSE PBRLookDevHeaders 
@@ -60,6 +86,7 @@ add_executable(PBRLookDev ${PBRLookDevHeaders} ${PBRLookDevSources})
 target_include_directories(PBRLookDev 
     PUBLIC
         ${INCLUDE_DIR}
+        "${IMGUI_INCLUDE_DIRS}/imgui/backends"
 )
 
 target_link_libraries(PBRLookDev

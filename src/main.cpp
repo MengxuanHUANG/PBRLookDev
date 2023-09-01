@@ -5,8 +5,9 @@
 
 #include "Render/renderer.h"
 
-#include "Render/cameraController.h"
-#include "Core/eventDispatcher.h"
+#include <ImGui/imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 using namespace PBRLookDev;
 
@@ -86,12 +87,10 @@ int main()
 
 	while (!glfwWindowShouldClose(window->m_NativeWindow))
 	{
-		window->OnUpdate();
-
-		// ImGUI
-		
 		// render
 		renderer.OnUpdate();
+
+		window->OnUpdate();
 	}
 
 	return 0;

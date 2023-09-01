@@ -6,6 +6,8 @@
 #include "Core/window.h"
 #include "Core/eventDispatcher.h"
 
+#include <ImGui/imgui.h>
+
 #define JOIN(a, b) a##b
 #define JOIN2(a, b) JOIN(a, b)
 #define STR(a) #a
@@ -31,6 +33,8 @@ namespace PBRLookDev
 {
 	void Renderer::Init(unsigned int w, unsigned int h)
 	{
+		m_ImguiWrapper = mkU<ImguiWrapper>(WindowsWindow::GetWindow()->m_NativeWindow);
+
 		glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LEQUAL);
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -82,7 +86,18 @@ namespace PBRLookDev
 	bool Renderer::OnEvent(MyCore::Event& event)
 	{
 		EventDispatcher dispatcher(event);
-		return dispatcher.Dispatch<MyCore::MouseMovedEvent>(std::bind(&PerspectiveCameraController::OnMouseMoved, m_CamController.get(), std::placeholders::_1));
+		dispatcher.Dispatch<MyCore::MouseMovedEvent>(std::bind(&PerspectiveCameraController::OnMouseMoved, m_CamController.get(), std::placeholders::_1));
+		dispatcher.Dispatch<MyCore::WindowResizeEvent>(std::bind(&Renderer::OnWindowResize, this, std::placeholders::_1));
+
+		return false;
+	}
+
+	bool Renderer::OnWindowResize(MyCore::WindowResizeEvent& event)
+	{
+		m_PersCamera->width = event.GetWidth();
+		m_PersCamera->height = event.GetHeight();
+
+		return false;
 	}
 
 	void Renderer::RenderCubeMapToTexture()
@@ -181,6 +196,8 @@ namespace PBRLookDev
 
 	void Renderer::OnUpdate()
 	{
+		double time = static_cast<float>(WindowsWindow::GetWindow()->GetTime());
+
 		glViewport(0, 0, m_PersCamera->width, m_PersCamera->height);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -219,11 +236,6 @@ namespace PBRLookDev
 		m_SDF_PBRShader->SetUniformFloat3("u_Up", m_PersCamera->up);
 		m_SDF_PBRShader->SetUniformFloat2("u_ScreenDims", {m_PersCamera->width, m_PersCamera->height });
 
-		m_SDF_PBRShader->SetUniformFloat3("u_Albedo", {1, 1, 1});
-		m_SDF_PBRShader->SetUniformFloat("u_Metallic", 1.f);
-		m_SDF_PBRShader->SetUniformFloat("u_Roughness", 0.f);
-		m_SDF_PBRShader->SetUniformFloat("u_AmbientOcclusion", 1.f);
-
 		m_SquareVertBuffer->Bind();
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, false, 5 * sizeof(float), (void*)(0));
@@ -237,23 +249,35 @@ namespace PBRLookDev
 		glEnable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
 
-		// render triangle
-		//m_TestShader->Bind();
-		//m_TestShader->SetUniformMat4("u_ViewProjection", m_PersCamera->GetViewProj());
-		//m_TestShader->SetUniformMat4("u_Transform", glm::mat4(1));
-		//m_EnvMap->Bind(0);
-		//m_TestShader->SetUniformInt("u_Texture", 0);
-		//
-		//m_VertBuffer->Bind();
-		//
-		//glEnableVertexAttribArray(0);
-		//glVertexAttribPointer(0, 3, GL_FLOAT, false, 6 * sizeof(float), (void*)(0));
-		//
-		//glEnableVertexAttribArray(1);
-		//glVertexAttribPointer(1, 3, GL_FLOAT, false, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-		//
-		//m_IdxBuffer->Bind();
-		//
-		//glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+		m_ImguiWrapper->Begin();
+		RenderImGui();
+		m_ImguiWrapper->End();
+
+		FrameTime = static_cast<float>(WindowsWindow::GetWindow()->GetTime()) - time;
+	}
+
+	void Renderer::RenderImGui()
+	{
+		ImGui::Begin("Configuration");
+		ImGui::Text("Frame Time: %f", FrameTime);
+		ImGui::Text("fps: %f", 1.f / FrameTime);
+		ImGui::End();
+
+		ImGui::Begin("Material");
+		{
+			static glm::vec3 albedo(1.f);
+			static float metallic = 1.f;
+			static float roughness = 0.f;
+
+			ImGui::ColorEdit3("Albedo", &albedo.x);
+			ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.f, 1.f);
+			ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.f, 1.f);
+
+			m_SDF_PBRShader->SetUniformFloat3("u_Albedo", albedo);
+			m_SDF_PBRShader->SetUniformFloat("u_Metallic", metallic);
+			m_SDF_PBRShader->SetUniformFloat("u_Roughness", roughness);
+			m_SDF_PBRShader->SetUniformFloat("u_AmbientOcclusion", 1.f);
+		}
+		ImGui::End();
 	}
 }

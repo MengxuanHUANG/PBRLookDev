@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Imgui/imguiWrapper.h"
+
 #include "shader.h"
 #include "buffer.h"
 #include "texture.h"
@@ -8,6 +10,8 @@
 
 namespace PBRLookDev
 {
+	class ImguiWrapper;
+
 	class Renderer
 	{
 	public:
@@ -18,7 +22,11 @@ namespace PBRLookDev
 
 		bool OnEvent(MyCore::Event& event);
 		void OnUpdate();
-		
+
+		void RenderImGui();
+
+		bool OnWindowResize(MyCore::WindowResizeEvent& event);
+
 	public:
 		void RenderCubeMapToTexture();
 		void RenderDiffuseCubeMap();
@@ -51,5 +59,8 @@ namespace PBRLookDev
 		uPtr<CubeMapFrameBuffer> m_EnvMapFB;
 		uPtr<CubeMapFrameBuffer> m_DiffuseFB;
 		uPtr<CubeMapFrameBuffer> m_GlossyFB;
+
+		uPtr<ImguiWrapper> m_ImguiWrapper;
+		float FrameTime;
 	};
 }
