@@ -43,8 +43,6 @@ namespace PBRLookDev
 
 		m_PersCamera = mkU<PerspectiveCamera>(w, h, 45.f, glm::vec3(0, 1, 15));
 		m_CamController = mkU<PerspectiveCameraController>(*m_PersCamera);
-		m_VertBuffer = mkU<OpenglBuffer>(GL_ARRAY_BUFFER);
-		m_IdxBuffer = mkU<OpenglBuffer>(GL_ELEMENT_ARRAY_BUFFER);
 		
 		m_CubeVertBuffer = mkU<OpenglBuffer>(GL_ARRAY_BUFFER);
 		m_CubeIdxBuffer = mkU<OpenglBuffer>(GL_ELEMENT_ARRAY_BUFFER);
@@ -53,10 +51,6 @@ namespace PBRLookDev
 
 		m_EnvMap = mkU<OpenglTexture>(res_base_path + "/textures/env/limpopo_golf_course_2k.hdr");
 		m_BRDFLookUpTex = mkU<OpenglTexture>(res_base_path + "/textures/brdfLUT.png");
-
-		m_TestShader = OpenglShader::Create("TestShader",
-												res_base_path + "/shaders/glsl/vertex.glsl",
-												res_base_path + "/shaders/glsl/fragment.glsl");
 		
 		m_EnvMapConversionShader = OpenglShader::Create("CubeMapConversionShader",
 															res_base_path + "/shaders/glsl/cubemap.vert.glsl",
@@ -282,14 +276,19 @@ namespace PBRLookDev
 
 		ImGui::Begin("Light and Shadow");
 		{
+			static glm::vec3 light_col(1.f);
 			static glm::vec3 light_pos(10, 10, 10);
+			static float light_strength = 10.0f;
 			static float light_radius = 2.0f;
 			static float shadow_darkness = 0.5f;
 
+			ImGui::ColorEdit3("Light Color", &light_col.x);
 			ImGui::DragFloat3("Light Position", &light_pos.x);
+			ImGui::DragFloat("Light Strength", &light_strength, 0.5f, 1.f, 100.f);
 			ImGui::DragFloat("Light Raduis", &light_radius, 0.01f, 0.1f, 5.f);
 			ImGui::DragFloat("Shadow Darkness", &shadow_darkness, 0.01f, 0.f, 1.f);
 
+			m_SDF_PBRShader->SetUniformFloat3("u_LightCol", light_strength * light_col);
 			m_SDF_PBRShader->SetUniformFloat3("u_LightPos", light_pos);
 			m_SDF_PBRShader->SetUniformFloat("u_LightRadius", light_radius);
 			m_SDF_PBRShader->SetUniformFloat("u_ShadowDarkness", shadow_darkness);

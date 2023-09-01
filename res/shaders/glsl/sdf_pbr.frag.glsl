@@ -17,6 +17,7 @@ uniform sampler2D u_BRDFLookupTexture;
 
 //Shadow Light
 uniform vec3 u_LightPos;
+uniform vec3 u_LightCol;
 uniform float u_LightRadius;
 uniform float u_ShadowDarkness;
 
@@ -55,6 +56,7 @@ float dot2(in vec3 v) { return dot(v, v); }
 float ndot(in vec2 a, in vec2 b) { return a.x * b.x - a.y * b.y; }
 
 float sceneSDF(vec3 query);
+vec3 pointLighting(BSDF bsdf, vec3 woW, in vec3 shadowRayDir, in float light_dist);
 vec3 metallic_workflow(BSDF bsdf, vec3 wo);
 float calculateObstruction(vec3 pos, vec3 shadowRayDir, float lightDist);
 
@@ -63,6 +65,41 @@ void coordinateSystem(in vec3 nor, out vec3 tan, out vec3 bitan)
     vec3 up = abs(nor.z) < 0.999f ? vec3(0.f, 0.f, 1.f) : vec3(1.f, 0.f, 0.f);
     tan = normalize(cross(up, nor));
     bitan = cross(nor, tan);
+}
+
+float DistributionGGX(vec3 normal, vec3 H, float roughness)
+{
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(normal, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+
+float GeometrySmith(vec3 normal, vec3 woW, vec3 wiW, float roughness)
+{
+    float NdotV = max(dot(normal, woW), 0.0);
+    float NdotL = max(dot(normal, -wiW), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
 }
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
@@ -219,7 +256,7 @@ void main()
 
         float level = (1.f - mix(0.f, u_ShadowDarkness, obstruction));
 
-        vec3 color = metallic_workflow(bsdf, -ray.direction);
+        vec3 color = pointLighting(bsdf, -ray.direction, shadow_dir, light_dist) +metallic_workflow(bsdf, -ray.direction);
         color = level * color;
 
         color = color / (color + vec3(1.0)); // Reinhard
@@ -229,6 +266,35 @@ void main()
     }
     else fs_Color = vec4(0.f);
     
+}
+
+vec3 pointLighting(BSDF bsdf, vec3 woW, in vec3 shadowRayDir, in float light_dist)
+{
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, u_Albedo, u_Metallic);
+
+    // compute light intensity falloff
+    float falloff = 1.f / (light_dist * light_dist);
+
+    vec3 radiance = falloff * u_LightCol;
+
+    vec3 wiW = -shadowRayDir; // from light to point
+    vec3 H = normalize(woW + (-wiW));
+    float cosTheta = max(dot(bsdf.nor, -wiW), 0.0);
+
+    // Cook-Torrance BRDF
+    float NDF = DistributionGGX(bsdf.nor, H, u_Roughness);
+    float G = GeometrySmith(bsdf.nor, woW, wiW, u_Roughness);
+    vec3 F = fresnelSchlick(clamp(dot(H, woW), 0.0, 1.0), F0);
+
+    vec3 ks = F;
+    vec3 kd = (1.f - u_Metallic) * (vec3(1.f) - ks);
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(bsdf.nor, woW), 0.0) * max(dot(bsdf.nor, -wiW), 0.0) + 0.0001; // avoid divide by zero
+    vec3 specular = numerator / denominator;
+
+    return (kd * u_Albedo / PI + specular) * radiance * cosTheta; // Lo
 }
 
 vec3 metallic_workflow(BSDF bsdf, vec3 wo) {

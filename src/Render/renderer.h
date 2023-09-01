@@ -38,7 +38,6 @@ namespace PBRLookDev
 		uPtr<PerspectiveCameraController> m_CamController;
 
 		// shaders
-		uPtr<OpenglShader> m_TestShader;
 		uPtr<OpenglShader> m_EnvMapConversionShader;
 		uPtr<OpenglShader> m_EnvMapShader;
 		uPtr<OpenglShader> m_DiffuseConversionsShader;
@@ -50,8 +49,6 @@ namespace PBRLookDev
 		uPtr<OpenglBuffer> m_CubeIdxBuffer;
 		uPtr<OpenglBuffer> m_SquareVertBuffer;
 		uPtr<OpenglBuffer> m_SquareIdxBuffer;
-		uPtr<OpenglBuffer> m_VertBuffer;
-		uPtr<OpenglBuffer> m_IdxBuffer;
 		uPtr<OpenglTexture> m_EnvMap;
 		uPtr<OpenglTexture> m_BRDFLookUpTex;
 
