@@ -15,8 +15,13 @@ uniform samplerCube u_DiffuseIrradianceMap;
 uniform samplerCube u_GlossyIrradianceMap;
 uniform sampler2D u_BRDFLookupTexture;
 
+//Shadow Light
+uniform vec3 u_LightPos;
+uniform float u_LightRadius;
+uniform float u_ShadowDarkness;
+
 in vec2 fs_UV;
-out vec4 out_Col;
+out vec4 fs_Color;
 
 const float PI = 3.14159f;
 const float T_MAX = 200.f;
@@ -41,7 +46,7 @@ struct BSDF {
 
 struct MarchResult {
     float t;
-    int hitSomething;
+    int iteration;
     BSDF bsdf;
 };
 
@@ -51,6 +56,7 @@ float ndot(in vec2 a, in vec2 b) { return a.x * b.x - a.y * b.y; }
 
 float sceneSDF(vec3 query);
 vec3 metallic_workflow(BSDF bsdf, vec3 wo);
+float calculateObstruction(vec3 pos, vec3 shadowRayDir, float lightDist);
 
 void coordinateSystem(in vec3 nor, out vec3 tan, out vec3 bitan)
 {
@@ -72,30 +78,58 @@ vec3 SDF_Normal(vec3 query)
         sceneSDF(query + epsilon.xxy) - sceneSDF(query - epsilon.xxy)));
 }
 
-float SDF_Sphere(vec3 query, vec3 center, float radius) {
+float SDF_Sphere(vec3 query, vec3 center, float radius) 
+{
     return length(query - center) - radius;
 }
+float SDF_Plane(vec3 p, vec3 a, vec3 b, vec3 c, vec3 d)
+{
+    vec3 ba = b - a; vec3 pa = p - a;
+    vec3 cb = c - b; vec3 pb = p - b;
+    vec3 dc = d - c; vec3 pc = p - c;
+    vec3 ad = a - d; vec3 pd = p - d;
+    vec3 nor = cross(ba, ad);
 
-float subtract(float d1, float d2) {
+    return sqrt(
+        (sign(dot(cross(ba, nor), pa)) +
+            sign(dot(cross(cb, nor), pb)) +
+            sign(dot(cross(dc, nor), pc)) +
+            sign(dot(cross(ad, nor), pd)) < 3.0)
+        ?
+        min(min(min(
+            dot2(ba * clamp(dot(ba, pa) / dot2(ba), 0.0, 1.0) - pa),
+            dot2(cb * clamp(dot(cb, pb) / dot2(cb), 0.0, 1.0) - pb)),
+            dot2(dc * clamp(dot(dc, pc) / dot2(dc), 0.0, 1.0) - pc)),
+            dot2(ad * clamp(dot(ad, pd) / dot2(ad), 0.0, 1.0) - pd))
+        :
+        dot(nor, pa) * dot(nor, pa) / dot2(nor));
+}
+
+float subtract(float d1, float d2) 
+{
     return max(d1, -d2);
 }
 
-float opIntersection(float d1, float d2) {
+float opIntersection(float d1, float d2) 
+{
     return max(d1, d2);
 }
 
-float opOnion(float sdf, float thickness) {
+float opOnion(float sdf, float thickness) 
+{
     return abs(sdf) - thickness;
 }
 
-vec3 rotateX(vec3 p, float angle) {
+vec3 rotateX(vec3 p, float angle) 
+{
     angle = angle * 3.14159 / 180.f;
     float c = cos(angle);
     float s = sin(angle);
     return vec3(p.x, c * p.y - s * p.z, s * p.y + c * p.z);
 }
 
-vec3 rotateZ(vec3 p, float angle) {
+vec3 rotateZ(vec3 p, float angle) 
+{
     angle = angle * 3.14159 / 180.f;
     float c = cos(angle);
     float s = sin(angle);
@@ -104,13 +138,33 @@ vec3 rotateZ(vec3 p, float angle) {
 
 float sceneSDF(vec3 query) 
 {
-    return SDF_Sphere(query, vec3(0.), 1.f);
+    float sphere_dist = SDF_Sphere(query, vec3(0.f, 0.5f, 0.f), 1.5f);
+    float plane_dist = SDF_Plane(query, 
+                                vec3(-10.f, -1.f, -10.f),
+                                vec3( 10.f, -1.f, -10.f),
+                                vec3( 10.f, -1.f,  10.f),
+                                vec3(-10.f, -1.f,  10.f));
+
+    return min(sphere_dist, plane_dist);
 }
 
 BSDF sceneBSDF(vec3 query) 
 {
-    return BSDF(query, SDF_Normal(query), u_Albedo,
-        u_Metallic, u_Roughness, u_AmbientOcclusion);
+    float sphere_dist = SDF_Sphere(query, vec3(0.f, 0.5f, 0.f), 1.5f);
+    float plane_dist = SDF_Plane(query,
+                                    vec3(-10.f, -1.f, -10.f),
+                                    vec3(10.f, -1.f, -10.f),
+                                    vec3(10.f, -1.f, 10.f),
+                                    vec3(-10.f, -1.f, 10.f));
+    BSDF result = BSDF(query, SDF_Normal(query), u_Albedo, u_Metallic, u_Roughness, u_AmbientOcclusion);
+
+    if (plane_dist < sphere_dist)
+    {
+        result.albedo = vec3(1.f);
+        result.metallic = 0.f;
+        result.roughness = 0.5f;
+    }
+    return result;
 }
 
 #define FOVY 45 * PI / 180.f
@@ -154,14 +208,27 @@ void main()
     BSDF bsdf = result.bsdf;
     vec3 pos = ray.origin + result.t * ray.direction;
 
-    //vec3 color = 0.5f * (bsdf.nor + 1.f);
+    if (result.iteration > 0)
+    {
+        // shadow ray test
+        vec3 shadow_dir = normalize(u_LightPos - pos);
+        float light_dist = length(u_LightPos - pos);
+        
+        float lightStrength = 20.f;
+        float obstruction = calculateObstruction(pos, shadow_dir, light_dist);
 
-    vec3 color = metallic_workflow(bsdf, -ray.direction);
+        float level = (1.f - mix(0.f, u_ShadowDarkness, obstruction));
 
-    color = color / (color + vec3(1.0)); // Reinhard
-    color = pow(color, vec3(1.0 / 2.2)); // Gamma correction
+        vec3 color = metallic_workflow(bsdf, -ray.direction);
+        color = level * color;
 
-    out_Col = vec4(color, result.hitSomething > 0 ? 1. : 0.);
+        color = color / (color + vec3(1.0)); // Reinhard
+        color = pow(color, vec3(1.0 / 2.2)); // Gamma correction
+        
+        fs_Color = vec4(color, 1.f);
+    }
+    else fs_Color = vec4(0.f);
+    
 }
 
 vec3 metallic_workflow(BSDF bsdf, vec3 wo) {
@@ -197,4 +264,20 @@ vec3 metallic_workflow(BSDF bsdf, vec3 wo) {
     vec3 color = ambient;
 
     return color;
+}
+
+float calculateObstruction(vec3 pos, vec3 shadowRayDir, float lightDist)
+{
+    float d, t = u_LightRadius * 0.1;
+    float obstruction = 0.;
+    for (int j = 0; j < 128; j++)
+    {
+        d = sceneSDF(pos + t * shadowRayDir);
+        obstruction = max(0.5 + (-d) * lightDist / (2. * u_LightRadius * t), obstruction);
+        if (obstruction >= 1.) break; 
+
+        t += max(d, u_LightRadius * t / lightDist);
+        if (t >= lightDist) break;
+    }
+    return clamp(obstruction, 0., 1.);
 }

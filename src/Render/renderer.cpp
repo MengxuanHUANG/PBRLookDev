@@ -6,7 +6,7 @@
 #include "Core/window.h"
 #include "Core/eventDispatcher.h"
 
-#include <ImGui/imgui.h>
+#include <imgui/imgui.h>
 
 #define JOIN(a, b) a##b
 #define JOIN2(a, b) JOIN(a, b)
@@ -41,7 +41,7 @@ namespace PBRLookDev
 		// Set the color with which the screen is filled at the start of each render call.
 		glClearColor(0.5, 0.5, 0.5, 1);
 
-		m_PersCamera = mkU<PerspectiveCamera>(w, h);
+		m_PersCamera = mkU<PerspectiveCamera>(w, h, 45.f, glm::vec3(0, 1, 15));
 		m_CamController = mkU<PerspectiveCameraController>(*m_PersCamera);
 		m_VertBuffer = mkU<OpenglBuffer>(GL_ARRAY_BUFFER);
 		m_IdxBuffer = mkU<OpenglBuffer>(GL_ELEMENT_ARRAY_BUFFER);
@@ -267,7 +267,7 @@ namespace PBRLookDev
 		{
 			static glm::vec3 albedo(1.f);
 			static float metallic = 1.f;
-			static float roughness = 0.f;
+			static float roughness = 0.4f;
 
 			ImGui::ColorEdit3("Albedo", &albedo.x);
 			ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.f, 1.f);
@@ -277,6 +277,22 @@ namespace PBRLookDev
 			m_SDF_PBRShader->SetUniformFloat("u_Metallic", metallic);
 			m_SDF_PBRShader->SetUniformFloat("u_Roughness", roughness);
 			m_SDF_PBRShader->SetUniformFloat("u_AmbientOcclusion", 1.f);
+		}
+		ImGui::End();
+
+		ImGui::Begin("Light and Shadow");
+		{
+			static glm::vec3 light_pos(10, 10, 10);
+			static float light_radius = 2.0f;
+			static float shadow_darkness = 0.5f;
+
+			ImGui::DragFloat3("Light Position", &light_pos.x);
+			ImGui::DragFloat("Light Raduis", &light_radius, 0.01f, 0.1f, 5.f);
+			ImGui::DragFloat("Shadow Darkness", &shadow_darkness, 0.01f, 0.f, 1.f);
+
+			m_SDF_PBRShader->SetUniformFloat3("u_LightPos", light_pos);
+			m_SDF_PBRShader->SetUniformFloat("u_LightRadius", light_radius);
+			m_SDF_PBRShader->SetUniformFloat("u_ShadowDarkness", shadow_darkness);
 		}
 		ImGui::End();
 	}
