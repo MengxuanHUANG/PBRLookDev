@@ -42,4 +42,9 @@ namespace PBRLookDev
 	{
 		return glm::perspective(glm::radians(fovy), width / (float)height, 0.1f, 100.f) * glm::lookAt(position, ref, up);
 	}
+
+	glm::mat4 PerspectiveCamera::GetViewProj_OrientedOnly()
+	{
+		return glm::perspective(glm::radians(fovy), width / (float)height, 0.1f, 100.f) * glm::lookAt(glm::vec3(0, 0, 0), ref - position, up);
+	}
 }

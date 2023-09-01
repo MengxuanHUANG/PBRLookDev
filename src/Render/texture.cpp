@@ -18,6 +18,8 @@ namespace PBRLookDev
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, param);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, param);
 
+		stbi_set_flip_vertically_on_load(true);
+
 		// read image
 		m_RawData = stbi_loadf(path.c_str(), &m_Width, &m_Height, NULL, 4);
 		if (!m_RawData)

@@ -10,14 +10,15 @@ namespace PBRLookDev
 		PerspectiveCamera(unsigned int w, 
 						  unsigned int h, 
 						  float fovy = 45.f,
-						  const glm::vec3& pos = glm::vec3(0, 0, -30),
-						  const glm::vec3& ref = glm::vec3(0, 0, 0),
+						  const glm::vec3& pos = glm::vec3(0, 0, 10),
+						  const glm::vec3& ref = glm::vec3(0, 1, 0),
 						  const glm::vec3& worldUp = glm::vec3(0, 1, 0));
 
 		PerspectiveCamera(const PerspectiveCamera& c);
 
 		void RecomputeAttributes();
 		glm::mat4 GetViewProj();
+		glm::mat4 GetViewProj_OrientedOnly();
 	public:
 		// perspective camera parameters
 		unsigned int width, height;
