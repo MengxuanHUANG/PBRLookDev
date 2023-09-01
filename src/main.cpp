@@ -48,6 +48,24 @@ void CreateTestTriangle(Renderer& renderer)
 	renderer.m_IdxBuffer->BufferData(indices.data(), indices.size() * sizeof(unsigned int));
 }
 
+void CreateSquare(Renderer& renderer)
+{
+	std::vector<float> vertices{ 
+		-1, -1, 0, 0, 0,
+		 1, -1, 0, 1, 0,
+		 1,  1, 0, 1, 1,
+		-1,  1, 0, 0, 1
+	};
+
+	std::vector<unsigned int> indices{ 
+		0, 1, 2, 
+		0, 2, 3 
+	};
+
+	renderer.m_SquareVertBuffer->BufferData(vertices.data(), vertices.size() * sizeof(float));
+	renderer.m_SquareIdxBuffer->BufferData(indices.data(), indices.size() * sizeof(unsigned int));
+}
+
 int main()
 {
 	MyCore::WindowProps props({ 600, 600 }, "PBRLookDev");
@@ -58,9 +76,13 @@ int main()
 
 	CreateCubeData(renderer);
 	CreateTestTriangle(renderer);
-	
+	CreateSquare(renderer);
+
 	renderer.RenderCubeMapToTexture();
 	renderer.m_EnvMapFB->GenMipMaps();
+
+	renderer.RenderDiffuseCubeMap();
+	renderer.RenderGlossyCubeMap();
 
 	while (!glfwWindowShouldClose(window->m_NativeWindow))
 	{

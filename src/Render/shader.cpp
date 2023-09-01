@@ -199,6 +199,13 @@ namespace PBRLookDev
 		ASSERT(location != -1);
 		glUniform1f(location, value);
 	}
+	void OpenglShader::SetUniformFloat2(const std::string& name, const glm::vec2& value)
+	{
+		UseMe();
+		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		ASSERT(location != -1);
+		glUniform2f(location, value.x, value.y);
+	}
 	void OpenglShader::SetUniformFloat3(const std::string& name, const glm::vec3& value)
 	{
 		UseMe();

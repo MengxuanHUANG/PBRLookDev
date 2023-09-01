@@ -30,8 +30,7 @@ namespace PBRLookDev
         m_DevicePixelRatio = devicePixelRatio;
 
         // Initialize depth buffer
-        BindRenderBuffer();
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, m_Width * m_DevicePixelRatio, m_Height * m_DevicePixelRatio);
+        BindRenderBuffer(m_Width, m_Height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_DepthRenderBuffer);
 
         BindFrameBuffer();

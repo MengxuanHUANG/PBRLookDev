@@ -13,7 +13,11 @@ namespace PBRLookDev
         virtual void BindToTextureSlot(unsigned int slot) = 0;
 
         inline void BindFrameBuffer() { glBindFramebuffer(GL_FRAMEBUFFER, m_FrameBuffer); }
-        inline void BindRenderBuffer() { glBindRenderbuffer(GL_RENDERBUFFER, m_DepthRenderBuffer); }
+        inline void BindRenderBuffer(unsigned int w, unsigned int h) 
+        {
+            glBindRenderbuffer(GL_RENDERBUFFER, m_DepthRenderBuffer);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w * m_DevicePixelRatio, h * m_DevicePixelRatio);
+        }
 
     public:
         GLuint m_FrameBuffer;
