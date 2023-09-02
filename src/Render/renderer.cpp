@@ -262,7 +262,7 @@ namespace PBRLookDev
 			static glm::vec3 albedo(1.f);
 			static float metallic = 1.f;
 			static float roughness = 0.4f;
-
+			
 			ImGui::ColorEdit3("Albedo", &albedo.x);
 			ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.f, 1.f);
 			ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.f, 1.f);
@@ -271,6 +271,25 @@ namespace PBRLookDev
 			m_SDF_PBRShader->SetUniformFloat("u_Metallic", metallic);
 			m_SDF_PBRShader->SetUniformFloat("u_Roughness", roughness);
 			m_SDF_PBRShader->SetUniformFloat("u_AmbientOcclusion", 1.f);
+
+			static float subsurfaceScattering = 0.0f;
+			static float distortion = 0.2f;
+			static float glow = 6.f;
+			static float ambient = 0.0f;
+			static float scale = 3.0f;
+
+			ImGui::DragFloat("Subsurface Scattering", &subsurfaceScattering, 0.1f, 0.f, 1.f);
+			ImGui::DragFloat("Distrotion", &distortion, 0.05f, 0.f, 1.f);
+			ImGui::DragFloat("Glow Scattering", &glow, 0.5f, 0.f, 10.f);
+			ImGui::DragFloat("Ambient", &ambient, 0.01f, 0.f, 1.f);
+			ImGui::DragFloat("Scale", &scale, 0.5f, 1.f, 10.f);
+
+			m_SDF_PBRShader->SetUniformFloat("u_SScattering", subsurfaceScattering);
+			m_SDF_PBRShader->SetUniformFloat("u_Distortion", distortion);
+			m_SDF_PBRShader->SetUniformFloat("u_Glow", glow);
+			m_SDF_PBRShader->SetUniformFloat("u_Ambient", ambient);
+			m_SDF_PBRShader->SetUniformFloat("u_Scale", scale);
+			m_SDF_PBRShader->SetUniformFloat("u_K", 2.f);
 		}
 		ImGui::End();
 

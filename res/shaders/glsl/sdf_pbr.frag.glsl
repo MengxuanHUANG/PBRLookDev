@@ -4,11 +4,17 @@ uniform vec3 u_CamPos;
 uniform vec3 u_Forward, u_Right, u_Up;
 uniform vec2 u_ScreenDims;
 
-// metallic workflow attrib
+// material attrib
 uniform vec3 u_Albedo;
 uniform float u_Metallic;
 uniform float u_Roughness;
 uniform float u_AmbientOcclusion;
+uniform float u_SScattering;
+uniform float u_Distortion;
+uniform float u_Glow;
+uniform float u_Ambient;
+uniform float u_Scale;
+uniform float u_K;
 
 // IBL
 uniform samplerCube u_DiffuseIrradianceMap;
@@ -43,6 +49,9 @@ struct BSDF {
     float metallic;
     float roughness;
     float ao;
+    
+    float SScattering;
+    float thinness;
 };
 
 struct MarchResult {
@@ -59,6 +68,13 @@ float sceneSDF(vec3 query);
 vec3 pointLighting(BSDF bsdf, vec3 woW, in vec3 shadowRayDir, in float light_dist);
 vec3 metallic_workflow(BSDF bsdf, vec3 wo);
 float calculateObstruction(vec3 pos, vec3 shadowRayDir, float lightDist);
+vec3 subsurfaceColor(BSDF bsdf, vec3 woW);
+float ComputeThinness(Ray ray);
+
+Ray SpawnRay(vec3 p, vec3 dir, float k)
+{
+    return Ray(p + k * dir, dir);
+}
 
 void coordinateSystem(in vec3 nor, out vec3 tan, out vec3 bitan)
 {
@@ -185,7 +201,7 @@ float sceneSDF(vec3 query)
     return min(sphere_dist, plane_dist);
 }
 
-BSDF sceneBSDF(vec3 query) 
+BSDF sceneBSDF(vec3 query, vec3 woW) 
 {
     float sphere_dist = SDF_Sphere(query, vec3(0.f, 0.5f, 0.f), 1.5f);
     float plane_dist = SDF_Plane(query,
@@ -193,13 +209,17 @@ BSDF sceneBSDF(vec3 query)
                                     vec3(10.f, -1.f, -10.f),
                                     vec3(10.f, -1.f, 10.f),
                                     vec3(-10.f, -1.f, 10.f));
-    BSDF result = BSDF(query, SDF_Normal(query), u_Albedo, u_Metallic, u_Roughness, u_AmbientOcclusion);
+    BSDF result = BSDF(query, SDF_Normal(query), u_Albedo, u_Metallic, u_Roughness, u_AmbientOcclusion, u_SScattering, 0.f);
+    
+    result.thinness = ComputeThinness(SpawnRay(query, woW, 0.2f));
+    result.thinness = mix(1.f, 0.f, 0.5f * result.thinness);
 
     if (plane_dist < sphere_dist)
     {
         result.albedo = vec3(1.f);
         result.metallic = 0.f;
         result.roughness = 0.5f;
+        result.SScattering = 0.0f;
     }
     return result;
 }
@@ -232,10 +252,10 @@ MarchResult raymarch(Ray ray)
 
         if (abs(distance) <= ISECT_EPSILON)
         {
-            return MarchResult(t, it, sceneBSDF(query_point));
+            return MarchResult(t, it, sceneBSDF(query_point, ray.direction));
         }
     }
-    return MarchResult(-1, 0, BSDF(vec3(0.), vec3(0.), vec3(0.), 0., 0., 0.));
+    return MarchResult(-1, 0, BSDF(vec3(0.), vec3(0.), vec3(0.), 0., 0., 0., 0., 0.));
 }
 
 void main()
@@ -255,9 +275,14 @@ void main()
         float obstruction = calculateObstruction(pos, shadow_dir, light_dist);
 
         float level = (1.f - mix(0.f, u_ShadowDarkness, obstruction));
+        
+        vec3 woW = normalize(u_CamPos - pos);
+        vec3 metallic_wf_col = pointLighting(bsdf, -ray.direction, shadow_dir, light_dist) + metallic_workflow(bsdf, -ray.direction);
+        vec3 subsurface_col = subsurfaceColor(bsdf, woW);
+        subsurface_col = metallic_wf_col + subsurface_col;
+        vec3 color = mix(metallic_wf_col, subsurface_col, bsdf.SScattering);
 
-        vec3 color = pointLighting(bsdf, -ray.direction, shadow_dir, light_dist) +metallic_workflow(bsdf, -ray.direction);
-        color = level * color;
+        //color = level * color;
 
         color = color / (color + vec3(1.0)); // Reinhard
         color = pow(color, vec3(1.0 / 2.2)); // Gamma correction
@@ -346,4 +371,37 @@ float calculateObstruction(vec3 pos, vec3 shadowRayDir, float lightDist)
         if (t >= lightDist) break;
     }
     return clamp(obstruction, 0., 1.);
+}
+
+vec3 subsurfaceColor(BSDF bsdf, vec3 woW)
+{
+    vec3 viewVec = woW;
+    vec3 lightDir = -woW;
+    float thinness = bsdf.thinness;
+    vec3 normal = bsdf.nor;
+    vec3 irradiance = texture(u_DiffuseIrradianceMap, lightDir).rgb;
+
+    vec3 scatterDir = lightDir + normal * u_Distortion;
+    float lightReachingEye = pow(clamp(dot(viewVec, -scatterDir), 0.0, 1.0), u_Glow) * u_Scale;
+    float attenuation = max(0.0, dot(normal, lightDir) + dot(viewVec, -lightDir));
+    float totalLight = attenuation * (lightReachingEye + u_Ambient) * u_K * thinness;
+    return bsdf.albedo * irradiance * totalLight;
+}
+
+float ComputeThinness(Ray ray)
+{
+    float t = 0.f;
+    int it = 0;
+    for (; it < MAX_ITERATIONS && t < T_MAX; ++it)
+    {
+        vec3 query_point = ray.origin + t * ray.direction;
+        float distance = -sceneSDF(query_point);
+        t += distance;
+
+        if (abs(distance) <= ISECT_EPSILON)
+        {
+            return t;
+        }
+    }
+    return 0.f;
 }
