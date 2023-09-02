@@ -42,4 +42,20 @@ namespace PBRLookDev
         unsigned int m_CubeMapId;
         bool m_Mipmap;
     };
+
+    class GFrameBuffer : public OpenglFrameBuffer
+    {
+    public:
+        GFrameBuffer(unsigned int w, unsigned int h, unsigned int devicePixelRatio);
+        ~GFrameBuffer();
+
+        virtual void Resize(unsigned int w, unsigned int h, unsigned int devicePixelRatio) override;
+        virtual void BindToTextureSlot(unsigned int slot) override {}
+
+    public:
+        unsigned int m_ColTextureId;
+        unsigned int m_PosTextureId;
+        unsigned int m_NorTextureId;
+        unsigned int m_DepthRoughnessTextureId;
+    };
 }

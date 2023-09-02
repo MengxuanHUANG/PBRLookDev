@@ -1,5 +1,11 @@
 #version 330 core
 
+in vec2 fs_UV;
+layout(location = 0) out vec4 fs_Color;
+layout(location = 1) out vec4 g_Position;
+layout(location = 2) out vec4 g_Normal;
+layout(location = 3) out vec4 g_DepthRoughness;
+
 uniform vec3 u_CamPos;
 uniform vec3 u_Forward, u_Right, u_Up;
 uniform vec2 u_ScreenDims;
@@ -27,9 +33,6 @@ uniform vec3 u_LightCol;
 uniform float u_LightRadius;
 uniform float u_ShadowDarkness;
 
-in vec2 fs_UV;
-out vec4 fs_Color;
-
 const float PI = 3.14159f;
 const float T_MAX = 200.f;
 const int MAX_ITERATIONS = 50;
@@ -52,6 +55,7 @@ struct BSDF {
     
     float SScattering;
     float thinness;
+    float ssr;
 };
 
 struct MarchResult {
@@ -209,7 +213,7 @@ BSDF sceneBSDF(vec3 query, vec3 woW)
                                     vec3(10.f, -1.f, -10.f),
                                     vec3(10.f, -1.f, 10.f),
                                     vec3(-10.f, -1.f, 10.f));
-    BSDF result = BSDF(query, SDF_Normal(query), u_Albedo, u_Metallic, u_Roughness, u_AmbientOcclusion, u_SScattering, 0.f);
+    BSDF result = BSDF(query, SDF_Normal(query), u_Albedo, u_Metallic, u_Roughness, u_AmbientOcclusion, u_SScattering, 0.f, 0.f);
     
     result.thinness = ComputeThinness(SpawnRay(query, woW, 0.2f));
     result.thinness = mix(1.f, 0.f, 0.5f * result.thinness);
@@ -217,9 +221,10 @@ BSDF sceneBSDF(vec3 query, vec3 woW)
     if (plane_dist < sphere_dist)
     {
         result.albedo = vec3(1.f);
-        result.metallic = 0.f;
-        result.roughness = 0.5f;
+        result.metallic = 1.f;
+        result.roughness = 0.0f;
         result.SScattering = 0.0f;
+        result.ssr = 1.0f;
     }
     return result;
 }
@@ -255,7 +260,7 @@ MarchResult raymarch(Ray ray)
             return MarchResult(t, it, sceneBSDF(query_point, ray.direction));
         }
     }
-    return MarchResult(-1, 0, BSDF(vec3(0.), vec3(0.), vec3(0.), 0., 0., 0., 0., 0.));
+    return MarchResult(-1, 0, BSDF(vec3(0.), vec3(0.), vec3(0.), 0.f, 0.f, 0.f, 0.f, 0.f, 0.f));
 }
 
 void main()
@@ -267,6 +272,10 @@ void main()
 
     if (result.iteration > 0)
     {
+        g_Position = vec4(pos, 1.f);
+        g_Normal = vec4(bsdf.nor, 1.f);
+        g_DepthRoughness = vec4(result.t, bsdf.roughness, bsdf.ssr, 1.f);
+
         // shadow ray test
         vec3 shadow_dir = normalize(u_LightPos - pos);
         float light_dist = length(u_LightPos - pos);
@@ -282,14 +291,20 @@ void main()
         subsurface_col = metallic_wf_col + subsurface_col;
         vec3 color = mix(metallic_wf_col, subsurface_col, bsdf.SScattering);
 
-        //color = level * color;
+        color = level * color;
 
         color = color / (color + vec3(1.0)); // Reinhard
         color = pow(color, vec3(1.0 / 2.2)); // Gamma correction
         
         fs_Color = vec4(color, 1.f);
     }
-    else fs_Color = vec4(0.f);
+    else
+    {
+        fs_Color = vec4(0.f);
+        g_Position = vec4(0.f);
+        g_Normal = vec4(0.f);
+        g_DepthRoughness = vec4(0.f);
+    }
     
 }
 

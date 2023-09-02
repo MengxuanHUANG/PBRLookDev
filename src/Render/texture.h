@@ -13,12 +13,7 @@
 // Texture slot for the BRDF lookup texture
 #define BRDF_LUT_TEX_SLOT 4
 
-#define ALBEDO_TEX_SLOT 5
-#define METALLIC_TEX_SLOT 6
-#define ROUGHNESS_TEX_SLOT 7
-#define AO_TEX_SLOT 8
-#define NORMALS_TEX_SLOT 9
-#define DISPLACEMENT_TEX_SLOT 10
+#define GBUFFER_COLOR_SLOT 5
 
 namespace PBRLookDev
 {

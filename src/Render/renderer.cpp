@@ -72,9 +72,14 @@ namespace PBRLookDev
 												res_base_path + "/shaders/glsl/do_nothing.vert.glsl",
 												res_base_path + "/shaders/glsl/sdf_pbr.frag.glsl");
 
+		m_PostProcessShader = OpenglShader::Create("PostProcessShader",
+													res_base_path + "/shaders/glsl/do_nothing.vert.glsl",
+													res_base_path + "/shaders/glsl/postprocess.frag.glsl");
+
 		m_EnvMapFB = mkU<CubeMapFrameBuffer>(1024, 1024, 1.f, true);
 		m_DiffuseFB = mkU<CubeMapFrameBuffer>(32, 32, 1.f, false);
 		m_GlossyFB = mkU<CubeMapFrameBuffer>(512, 512, 1.f, true);
+		m_GFrameFB = mkU<GFrameBuffer>(w, h, 1.f);
 	}
 
 	bool Renderer::OnEvent(MyCore::Event& event)
@@ -155,7 +160,7 @@ namespace PBRLookDev
 		m_GlossyConversionsShader->SetUniformInt("u_EnvironmentMap", ENV_MAP_CUBE_TEX_SLOT);
 		m_EnvMapFB->BindToTextureSlot(ENV_MAP_CUBE_TEX_SLOT);
 
-		glViewport(0, 0, m_GlossyFB->m_Width, m_GlossyFB->m_Height);
+		glViewport(0, 0, m_EnvMapFB->m_Width, m_EnvMapFB->m_Height);
 		m_GlossyFB->BindFrameBuffer();
 
 		const unsigned int maxMipLevels = 5;
@@ -191,6 +196,8 @@ namespace PBRLookDev
 	void Renderer::OnUpdate()
 	{
 		double time = static_cast<float>(WindowsWindow::GetWindow()->GetTime());
+
+		m_GFrameFB->BindFrameBuffer();
 
 		glViewport(0, 0, m_PersCamera->width, m_PersCamera->height);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -243,6 +250,42 @@ namespace PBRLookDev
 		glEnable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
 
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, m_PersCamera->width, m_PersCamera->height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		m_PostProcessShader->Bind();
+		glActiveTexture(GL_TEXTURE0 + GBUFFER_COLOR_SLOT);
+		glBindTexture(GL_TEXTURE_2D, m_GFrameFB->m_ColTextureId);
+		m_PostProcessShader->SetUniformInt("u_RenderedTexture", GBUFFER_COLOR_SLOT);
+
+		glActiveTexture(GL_TEXTURE0 + GBUFFER_COLOR_SLOT + 1);
+		glBindTexture(GL_TEXTURE_2D, m_GFrameFB->m_PosTextureId);
+		m_PostProcessShader->SetUniformInt("u_PositionTexture", GBUFFER_COLOR_SLOT + 1);
+
+		glActiveTexture(GL_TEXTURE0 + GBUFFER_COLOR_SLOT + 2);
+		glBindTexture(GL_TEXTURE_2D, m_GFrameFB->m_NorTextureId);
+		m_PostProcessShader->SetUniformInt("u_NormalTexture", GBUFFER_COLOR_SLOT + 2);
+
+		glActiveTexture(GL_TEXTURE0 + GBUFFER_COLOR_SLOT + 3);
+		glBindTexture(GL_TEXTURE_2D, m_GFrameFB->m_DepthRoughnessTextureId);
+		m_PostProcessShader->SetUniformInt("u_DepthRoughnessTexture", GBUFFER_COLOR_SLOT + 3);
+
+		m_PostProcessShader->SetUniformFloat3("u_CamPos", m_PersCamera->position);
+		m_PostProcessShader->SetUniformFloat3("u_Forward", m_PersCamera->forward);
+		m_PostProcessShader->SetUniformFloat2("u_ScreenDims", { m_PersCamera->width, m_PersCamera->height });
+		m_PostProcessShader->SetUniformMat4("u_ViewProj", m_PersCamera->GetViewProj());
+
+		m_SquareVertBuffer->Bind();
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, false, 5 * sizeof(float), (void*)(0));
+
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+		m_SquareIdxBuffer->Bind();
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
 		m_ImguiWrapper->Begin();
 		RenderImGui();
 		m_ImguiWrapper->End();
@@ -260,8 +303,8 @@ namespace PBRLookDev
 		ImGui::Begin("Material");
 		{
 			static glm::vec3 albedo(1.f);
-			static float metallic = 1.f;
-			static float roughness = 0.4f;
+			static float metallic = 0.f;
+			static float roughness = 1.0f;
 			
 			ImGui::ColorEdit3("Albedo", &albedo.x);
 			ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.f, 1.f);
@@ -302,7 +345,7 @@ namespace PBRLookDev
 			static float shadow_darkness = 0.5f;
 
 			ImGui::ColorEdit3("Light Color", &light_col.x);
-			ImGui::DragFloat3("Light Position", &light_pos.x);
+			ImGui::DragFloat3("Light Position", &light_pos.x, 0.5f, 0.0f, 100.f);
 			ImGui::DragFloat("Light Strength", &light_strength, 0.5f, 1.f, 100.f);
 			ImGui::DragFloat("Light Raduis", &light_radius, 0.01f, 0.1f, 5.f);
 			ImGui::DragFloat("Shadow Darkness", &shadow_darkness, 0.01f, 0.f, 1.f);
