@@ -6,6 +6,51 @@ namespace PBRLookDev
         : m_Width(w), m_Height(h), m_DevicePixelRatio(devicePixelRatio)
     {}
 
+    SimpleFrameBuffer::SimpleFrameBuffer(unsigned int w, unsigned int h, unsigned int devicePixelRatio)
+        : OpenglFrameBuffer(w, h, devicePixelRatio)
+    {
+        glGenFramebuffers(1, &m_FrameBuffer);
+        glGenTextures(1, &m_RenderedImage);
+
+        Resize(w, h, devicePixelRatio);
+    }
+
+    SimpleFrameBuffer::~SimpleFrameBuffer()
+    {
+        glDeleteTextures(1, &m_RenderedImage);
+        glDeleteFramebuffers(1, &m_FrameBuffer);
+    }
+
+    void SimpleFrameBuffer::Resize(unsigned int w, unsigned int h, unsigned int devicePixelRatio)
+    {
+        m_Width = w;
+        m_Height = h;
+        m_DevicePixelRatio = devicePixelRatio;
+
+        BindFrameBuffer();
+
+        glBindTexture(GL_TEXTURE_2D, m_RenderedImage);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_Width * m_DevicePixelRatio, m_Height * m_DevicePixelRatio, 0, GL_RGB, GL_UNSIGNED_BYTE, (void*)(0));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_RenderedImage, 0);
+
+        GLuint attachments[1] = { GL_COLOR_ATTACHMENT1 };
+        glDrawBuffers(1, attachments);
+    }
+
+    void SimpleFrameBuffer::BindToTextureSlot(unsigned int slot)
+    {
+        m_TextureSlot = slot;
+        glActiveTexture(GL_TEXTURE0 + slot);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, m_RenderedImage);
+    }
+
+    float* SimpleFrameBuffer::GetRenderedImage()
+    {
+        return nullptr;
+    }
+
     CubeMapFrameBuffer::CubeMapFrameBuffer(unsigned int w, unsigned int h, unsigned int devicePixelRatio, bool mipmap)
         : OpenglFrameBuffer(w, h, devicePixelRatio), m_Mipmap(mipmap)
     {

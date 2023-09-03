@@ -2,6 +2,7 @@
 /build
 /out
 /.vs
+/images/saved/
 
 # files
 CMakeSettings.json

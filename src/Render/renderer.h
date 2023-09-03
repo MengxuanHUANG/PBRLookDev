@@ -44,6 +44,7 @@ namespace PBRLookDev
 		uPtr<OpenglShader> m_GlossyConversionsShader;
 		uPtr<OpenglShader> m_SDF_PBRShader;
 		uPtr<OpenglShader> m_PostProcessShader;
+		uPtr<OpenglShader> m_SimpleDisplayShader;
 
 		// buffers & textures
 		uPtr<OpenglBuffer> m_CubeVertBuffer;
@@ -58,8 +59,8 @@ namespace PBRLookDev
 		uPtr<CubeMapFrameBuffer> m_DiffuseFB;
 		uPtr<CubeMapFrameBuffer> m_GlossyFB;
 		uPtr<GFrameBuffer> m_GFrameFB;
+		uPtr<SimpleFrameBuffer> m_SimpleFrameFB;
 
 		uPtr<ImguiWrapper> m_ImguiWrapper;
-		float FrameTime;
 	};
 }

@@ -49,7 +49,7 @@ void CreateSquare(Renderer& renderer)
 
 int main()
 {
-	MyCore::WindowProps props({ 1280, 720 }, "PBRLookDev");
+	MyCore::WindowProps props({ 1280, 720 }, "Mengxuan's PBRLookDev");
 
 	Renderer renderer;
 	uPtr<MyCore::WindowsWindow> window = mkU<MyCore::WindowsWindow>(props, std::bind(&Renderer::OnEvent, &renderer, std::placeholders::_1));

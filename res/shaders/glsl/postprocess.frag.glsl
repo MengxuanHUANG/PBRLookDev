@@ -1,7 +1,7 @@
 #version 330 core
 
 in vec2 fs_UV;
-out vec3 fs_Color;
+layout(location = 0) out vec3 fs_Color;
 
 uniform sampler2D u_RenderedTexture;
 uniform sampler2D u_PositionTexture;

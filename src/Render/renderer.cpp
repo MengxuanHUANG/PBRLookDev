@@ -1,12 +1,16 @@
 #include "renderer.h"
 
 #include <array>
+#include <format>
+#include <filesystem>
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Core/window.h"
 #include "Core/eventDispatcher.h"
 
 #include <imgui/imgui.h>
+#include <stb_image_write.h>
 
 #define JOIN(a, b) a##b
 #define JOIN2(a, b) JOIN(a, b)
@@ -14,6 +18,7 @@
 #define STR2(a) STR(a)
 
 const std::string res_base_path = STR2(JOIN2(PROJ_BASE_PATH, /res));
+const std::string img_save_path = STR2(JOIN2(PROJ_BASE_PATH, /images/saved/));
 
 // -X, +X, -Y, +Y, -Z, +Z
 const static glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
@@ -76,10 +81,15 @@ namespace PBRLookDev
 													res_base_path + "/shaders/glsl/do_nothing.vert.glsl",
 													res_base_path + "/shaders/glsl/postprocess.frag.glsl");
 
+		m_SimpleDisplayShader = OpenglShader::Create("SimpleDisplay",
+													res_base_path + "/shaders/glsl/do_nothing.vert.glsl",
+													res_base_path + "/shaders/glsl/display.frag.glsl");
+
 		m_EnvMapFB = mkU<CubeMapFrameBuffer>(1024, 1024, 1.f, true);
 		m_DiffuseFB = mkU<CubeMapFrameBuffer>(32, 32, 1.f, false);
 		m_GlossyFB = mkU<CubeMapFrameBuffer>(512, 512, 1.f, true);
 		m_GFrameFB = mkU<GFrameBuffer>(w, h, 1.f);
+		m_SimpleFrameFB = mkU<SimpleFrameBuffer>(w, h, 1.f);
 	}
 
 	bool Renderer::OnEvent(MyCore::Event& event)
@@ -95,7 +105,8 @@ namespace PBRLookDev
 	{
 		m_PersCamera->width = event.GetWidth();
 		m_PersCamera->height = event.GetHeight();
-
+		m_GFrameFB->Resize(m_PersCamera->width, m_PersCamera->height, 1.f);
+		m_SimpleFrameFB->Resize(m_PersCamera->width, m_PersCamera->height, 1.f);
 		return false;
 	}
 
@@ -195,8 +206,6 @@ namespace PBRLookDev
 
 	void Renderer::OnUpdate()
 	{
-		double time = static_cast<float>(WindowsWindow::GetWindow()->GetTime());
-
 		m_GFrameFB->BindFrameBuffer();
 
 		glViewport(0, 0, m_PersCamera->width, m_PersCamera->height);
@@ -250,7 +259,8 @@ namespace PBRLookDev
 		glEnable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// render to a simple framebuffer
+		m_SimpleFrameFB->BindFrameBuffer();
 		glViewport(0, 0, m_PersCamera->width, m_PersCamera->height);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -286,20 +296,38 @@ namespace PBRLookDev
 		m_SquareIdxBuffer->Bind();
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+		// final display
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, m_PersCamera->width, m_PersCamera->height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		m_SimpleDisplayShader->Bind();
+
+		m_SquareVertBuffer->Bind();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_SimpleFrameFB->m_RenderedImage);
+		m_PostProcessShader->SetUniformInt("u_RenderedTexture", GL_TEXTURE0);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, false, 5 * sizeof(float), (void*)(0));
+
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+		m_SquareIdxBuffer->Bind();
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
 		m_ImguiWrapper->Begin();
 		RenderImGui();
 		m_ImguiWrapper->End();
-
-		FrameTime = static_cast<float>(WindowsWindow::GetWindow()->GetTime()) - time;
 	}
 
 	void Renderer::RenderImGui()
 	{
 		ImGui::Begin("Configuration");
-		ImGui::Text("Frame Time: %f", FrameTime);
-		ImGui::Text("fps: %f", 1.f / FrameTime);
+		ImGui::Text("Frame Time: %f", 1.f / ImGui::GetIO().Framerate);
+		ImGui::Text("fps: %f", ImGui::GetIO().Framerate);
 		ImGui::End();
-
+		
 		ImGui::Begin("Material");
 		{
 			static glm::vec3 albedo(1.f);
@@ -354,6 +382,36 @@ namespace PBRLookDev
 			m_SDF_PBRShader->SetUniformFloat3("u_LightPos", light_pos);
 			m_SDF_PBRShader->SetUniformFloat("u_LightRadius", light_radius);
 			m_SDF_PBRShader->SetUniformFloat("u_ShadowDarkness", shadow_darkness);
+		}
+		ImGui::End();
+
+		ImGui::Begin("Image");
+		{
+			static char name[100] = "PBRLookDev";
+
+			ImVec2 wsize = ImGui::GetWindowSize();
+			ImGui::InputText("Image Name", name, 100);
+			
+			if (ImGui::Button("Save Image"))
+			{
+				if (!std::filesystem::exists(img_save_path))
+				{
+					std::filesystem::create_directories(img_save_path);
+				}
+				std::string extension = ".png";
+
+				GLsizei width, height;
+				std::vector<unsigned char> image_data;
+				image_data.resize(m_PersCamera->width * m_PersCamera->height * 3, 0.f);
+
+				// Retrieve the texture data
+				m_SimpleFrameFB->BindToTextureSlot(GL_TEXTURE0);
+				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, image_data.data());
+
+				stbi_flip_vertically_on_write(true);
+				stbi_write_png((img_save_path + name + extension).c_str(), m_PersCamera->width, m_PersCamera->height, 3, image_data.data(), m_PersCamera->width * 3);
+				stbi_flip_vertically_on_write(false);
+			}
 		}
 		ImGui::End();
 	}

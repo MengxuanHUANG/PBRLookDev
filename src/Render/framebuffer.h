@@ -27,6 +27,21 @@ namespace PBRLookDev
         unsigned int m_TextureSlot;
     };
 
+    class SimpleFrameBuffer : public OpenglFrameBuffer
+    {
+    public:
+        SimpleFrameBuffer(unsigned int w, unsigned int h, unsigned int devicePixelRatio);
+        ~SimpleFrameBuffer();
+
+        virtual void Resize(unsigned int w, unsigned int h, unsigned int devicePixelRatio) override;
+        virtual void BindToTextureSlot(unsigned int slot) override;
+
+        float* GetRenderedImage();
+
+    public:
+        unsigned int m_RenderedImage;
+    };
+
     class CubeMapFrameBuffer : public OpenglFrameBuffer 
     {
     public:
